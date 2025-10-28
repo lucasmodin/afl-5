@@ -10,7 +10,7 @@ struct setting_t {
 // TODO: Ret `char *` til at være `struct setting_t *`
 struct config_t {
     // struct setting_t *lines[20];
-    struct setting_t *settings_t;
+    struct setting_t *lines[20];
     size_t count;
 };
 
