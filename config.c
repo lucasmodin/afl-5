@@ -10,53 +10,45 @@
  * hver linje i config-filen.
  */
 struct config_t *read_config(char *filename) {
-    // Hvis 'filename' er NULL, skal funktionen fejle.
+
+    //hvis fil stien ikke findes
     if (filename == NULL) {
         fprintf(stderr, "Filename is empty\n");
         return NULL;
     }
 
-    // Hvis filen fejler at åbne, skal funktionen fejle.
+    //hvis filen fejler at åbne, skal funktionen fejle
     FILE *fr = fopen(filename, "r");
     if (fr == NULL) {
         fprintf(stderr, "Could not open %s\n", filename);
         return NULL;
     }
 
-    // Der allokeres plads til `struct config_t`-værdien
+    //config_t holder alle settings i en fil
     struct config_t *config = malloc(sizeof(struct config_t));
+    if (!config) {
+        return NULL; //safe guard
+    }
 
-    // Der er blevet indlæst 0 settings i config'en
-    config->count = 0;
+    config->count = 0; //holder styr på hvor mange settings der er læst ind
+    char buf1[256]; //stack allokeret buffer der holder en linje fra filen af gangen
 
-    // Der stak-allokeres plads til at indlæse en enkelt linje. Det er okay med
-    // en stak-allokering her, fordi den er midlertidig: vi skal ikke bruge bufferen
-    // når vi først har indlæst hele konfigurationen. Så den er midlertidig inde i
-    // funktionen.
-    char buf1[256];
-
-    // - `fgets()` returnerer NULL når vi er nået bunden af filen
-    // - Der læses højest `sizeof(buf1)` bytes ind i buf1
-    // - `fgets()` husker at gøre plads til NUL-byte'en!
+    //vi læser filen linje for linje indtil filen slutter
     while (fgets(buf1, sizeof(buf1), fr) != NULL) {
-        // Der heap-allokeres plads til den enkelte linje. Det er nødvendigt
-        // med heap-allokering fordi den ellers vil gå tabt når read_config()
-        // returnerer. Og `malloc()` tager ikke højde for NUL-byt'en. :(
-        char *buf2 = malloc(strlen(buf1) + 1);
 
-        // `buf1` kopieres ind i `buf2`: Fra den midlertidige stak-allokerede
-        // buffer buf1, som genbruges for hver linje, til de dedikerede heap-
-        // allokerede buffere buf2, som der er én af for hver linje i filen.
+        //vi laver en heap allokeret kopi af filen
+        char *buf2 = malloc(strlen(buf1) + 1);
         strcpy(buf2, buf1);
 
-        // Efter `buf2` er allokeret og config-linjen er kopieret ind, skal
-        // pointeren gemmes i vores datastruktur, så den ikke går tabt. Den
-        // gemmes på plads `config->count` som er seneste ubrugte plads.
-        config->lines[config->count] = buf2; // brug setting_converter()
-
-        // `count` forøges så næste config-linjes buffer gemmes på næste plads.
-        config->count += 1;
+        //vi benytter vores setting_converter metode til at konvertere linjen til en setting_t
+        struct setting_t *setting = setting_converter(buf2);
+        free (buf2); // vi kan frigøre linjekopien da vi har allokeret i setting_converter metoden
+        if (setting) {
+            config->lines[config->count] = setting; //vi gemmer på den aktuelle plads
+            config->count = config->count + 1; //vi inkrementere count efter
+        }
     }
+    fclose(fr); //og vi lukker selvfølgelig filen til sidst
 
     return config;
 }
@@ -110,8 +102,7 @@ void print_setting(struct setting_t *setting) {
 
 void print_config(struct config_t *config) {
     for (int i = 0; i < config->count; i++) {
-        struct setting_t *setting = setting_converter(config->lines[i]);
-        print_setting(setting);
+        print_setting(config->lines[i]);
     }
 }
 
@@ -124,8 +115,9 @@ void free_config(struct config_t *config) {
     }
 
     for (int i = 0; i < config->count; i++) {
+        free(config->lines[i]->name);
+        free(config->lines[i]->value);
         free(config->lines[i]);
     }
-
     free(config);
 }
